@@ -16,28 +16,30 @@ version = '0.1'
 
 """
 *VIEWS*
-Columns for each view are defined in a tuple: (<HEADER>, <WIDTH>, <ATTRIBUTE>)
+Columns for each view are defined in a tuple:
+(<HEADER>, <WIDTH>, <ATTRIBUTE>, <SORT FUNC>)
 """
 
 _realtime = [
-        ('NAME', 30, 'name'),
-        ('STATUS', 7, 'status'),
-        ('SESSIONS', 9, ('scur', 'slim')),
-        ('REQUESTS', 9, ('req_rate', 'req_tot')),
-        ('NET I/O', 20, ('bin', 'bout')),
-        ('PXNAME', 15, 'pxname')
+        ('NAME', 30, 'name', lambda x: x.name),
+        ('STATUS', 7, 'status', lambda x: x.status),
+        ('SESSIONS', 9, ('scur', 'slim'), lambda x: x.scur),
+        ('REQUESTS', 9, ('req_rate', 'req_tot'), lambda x: x.req_rate),
+        ('NET I/O', 20, ('bin', 'bout'), lambda x: x.bin + x.bout),
+        ('CRQ TIME', 20, ('ctime', 'rtime', 'qtime', 'ttime'), None),
+        ('PXNAME', 15, 'pxname', None)
     ]
 
 sortable = [ 'name' ]
 views = { 'realtime': _realtime }
 
 class HAProxyTop(object):
-    def __init__(self, server_list, filter=None, sort_key='name'):
+    def __init__(self, server_list, filter=None):
         #set initial display options
-        self.sort = { 'key': sort_key, 'reversed': False }
         self.tree = True
         self.filter = filter
         self.active_view = 'realtime'
+        self.sort = { 'func': views[self.active_view][0][3], 'reversed': False }
 
         self.servers = [ HAProxyServer(s) for s in server_list ]
         self.keys = self.servers[0].fields
@@ -46,13 +48,6 @@ class HAProxyTop(object):
         self.stats  = {}
         while True:
             self.display(self.poll())
-
-    def server_sorter(self, servers):
-        """ Sort a list of servers using the sort key configured """
-        def _sort_by_attr(i):
-            return i.__getattribute__(self.sort['key'])
-
-        return sorted(servers, key=_sort_by_attr, reverse=self.sort['reversed'])
 
     def sig_handler(self, signal, frame):
         curses.endwin()
@@ -65,7 +60,7 @@ class HAProxyTop(object):
             s.update()
             display_items += s.backends
 
-        return self.server_sorter(display_items)
+        return sorted(display_items, key=self.sort['func'], reverse=self.sort['reversed'])
 
 #        if self.sums:
 #            self.display_stats = deepcopy(list(self.stats.values()))
@@ -225,8 +220,9 @@ class HAProxyTop(object):
         if x == ord('s'):
             startx = w / 2 - 20 # I have no idea why this offset of 20 is needed
 
-            selected = run_menu(tuple(sortable), x=int(startx), y=6, name="sort")
-            self.sort['key'] = sortable[selected]
+            opts = [ i[0] for i in views[self.active_view] if i[3] ]
+            selected = run_menu(tuple(opts), x=int(startx), y=6, name="sort")
+            self.sort['func'] = views[self.active_view][selected][3]
 
         if x == ord('f'):
             startx = w / 2 - 20 # I have no idea why this offset of 20 is needed
