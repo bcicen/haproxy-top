@@ -21,17 +21,17 @@ Columns for each view are defined in a tuple: (<HEADER>, <WIDTH>, <ATTRIBUTE>)
 _realtime = [
         ('NAME', 30, 'name'),
         ('STATUS', 7, 'status'),
-        ('SESSIONS', 9, ('scur', 'smax', 'slim')),
-        ('REQUESTS', 9, ('req_rate', 'req_rate_max', 'req_tot')),
+        ('SESSIONS', 9, ('scur', 'slim')),
+        ('REQUESTS', 9, ('req_rate', 'req_tot')),
         ('PXNAME', 15, 'pxname')
     ]
 
 views = { 'realtime': _realtime }
 
 class HAProxyTop(object):
-    def __init__(self, server_list, filter=None, sort_key=None):
+    def __init__(self, server_list, filter=None, sort_key='name'):
         #set initial display options
-        self.sort = { 'key': sort_key, 'reversed': True }
+        self.sort = { 'key': sort_key, 'reversed': False }
         self.tree = True
         self.filter = filter
         self.active_view = 'realtime'
@@ -44,6 +44,13 @@ class HAProxyTop(object):
         while True:
             self.display(self.poll())
 
+    def server_sorter(self, servers):
+        """ Sort a list of servers using the sort key configured """
+        def _sort_by_attr(i):
+            return i.__getattribute__(self.sort['key'])
+
+        return sorted(servers, key=_sort_by_attr, reverse=self.sort['reversed'])
+
     def sig_handler(self, signal, frame):
         curses.endwin()
         sys.exit(0)
@@ -55,7 +62,7 @@ class HAProxyTop(object):
             s.update()
             display_items += s.backends
 
-        return display_items
+        return self.server_sorter(display_items)
 
 #        if self.sums:
 #            self.display_stats = deepcopy(list(self.stats.values()))
@@ -115,7 +122,7 @@ class HAProxyTop(object):
                 width = c[1]
                 if isinstance(c[2], tuple):
                     values = [ str(b.__getattribute__(i)) for i in c[2] ]
-                    value = '/'.join(values)
+                    value = '/'.join([ v if v else '-' for v in values ])
                 else:
                     value = str(b.__getattribute__(c[2]))
 
@@ -124,6 +131,8 @@ class HAProxyTop(object):
                     value = self._truncate(value, width)
 
                 if c[0] == 'NAME':
+                    if not self.tree:
+                        value = '%s (%d listeners)' % (value, len(b.listeners))
                     s.addstr(y_pos, x_pos, value, curses.color_pair(6))
                 elif c[0] == 'STATUS':
                     if value == 'UP':
@@ -146,7 +155,7 @@ class HAProxyTop(object):
                         width = c[1]
                         if isinstance(c[2], tuple):
                             values = [ str(l.__getattribute__(i)) for i in c[2] ]
-                            value = '/'.join(values)
+                            value = '/'.join([ v if v else '-' for v in values ])
                         else:
                             value = str(l.__getattribute__(c[2]))
                         
