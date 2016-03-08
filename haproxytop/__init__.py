@@ -9,6 +9,7 @@ from curses.textpad import Textbox,rectangle
 from haproxystats import HAProxyServer
 
 from menu import run_menu
+from util import format_bytes
 
 _startcol = 2
 version = '0.1'
@@ -23,9 +24,11 @@ _realtime = [
         ('STATUS', 7, 'status'),
         ('SESSIONS', 9, ('scur', 'slim')),
         ('REQUESTS', 9, ('req_rate', 'req_tot')),
+        ('NET I/O', 20, ('bin', 'bout')),
         ('PXNAME', 15, 'pxname')
     ]
 
+sortable = [ 'name' ]
 views = { 'realtime': _realtime }
 
 class HAProxyTop(object):
@@ -121,8 +124,11 @@ class HAProxyTop(object):
             for c in columns:
                 width = c[1]
                 if isinstance(c[2], tuple):
-                    values = [ str(b.__getattribute__(i)) for i in c[2] ]
-                    value = '/'.join([ v if v else '-' for v in values ])
+                    if c[0] == 'NET I/O':
+                        values = [ format_bytes(b.__getattribute__(i)) for i in c[2] ]
+                    else:
+                        values = [ str(b.__getattribute__(i)) for i in c[2] ]
+                    value = ' / '.join([ v if v else '-' for v in values ])
                 else:
                     value = str(b.__getattribute__(c[2]))
 
@@ -154,8 +160,11 @@ class HAProxyTop(object):
                     for c in columns:
                         width = c[1]
                         if isinstance(c[2], tuple):
-                            values = [ str(l.__getattribute__(i)) for i in c[2] ]
-                            value = '/'.join([ v if v else '-' for v in values ])
+                            if c[0] == 'NET I/O':
+                                values = [ format_bytes(l.__getattribute__(i)) for i in c[2] ]
+                            else:
+                                values = [ str(l.__getattribute__(i)) for i in c[2] ]
+                            value = ' / '.join([ v if v else '-' for v in values ])
                         else:
                             value = str(l.__getattribute__(c[2]))
                         
@@ -216,12 +225,8 @@ class HAProxyTop(object):
         if x == ord('s'):
             startx = w / 2 - 20 # I have no idea why this offset of 20 is needed
 
-            #format field names for readable output
-            opts = [ i[0] for i in views[self.active_view] ]
-            fmt_opts = [k.replace('_',' ').replace('total','') for k in opts]
-
-            selected = run_menu(tuple(fmt_opts), x=int(startx), y=6, name="sort")
-            self.sort['key'] = opts[selected]
+            selected = run_menu(tuple(sortable), x=int(startx), y=6, name="sort")
+            self.sort['key'] = sortable[selected]
 
         if x == ord('f'):
             startx = w / 2 - 20 # I have no idea why this offset of 20 is needed
