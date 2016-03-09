@@ -27,10 +27,9 @@ _realtime = [
         ('REQUESTS', 9, ('req_rate', 'req_tot'), lambda x: x.req_rate),
         ('NET I/O', 20, ('bin', 'bout'), lambda x: x.bin + x.bout),
         ('CRQ TIME', 20, ('ctime', 'rtime', 'qtime', 'ttime'), None),
-        ('PXNAME', 15, 'pxname', None)
+        ('PROXY', 15, 'proxy_name', lambda x: x.proxy_name)
     ]
 
-sortable = [ 'name' ]
 views = { 'realtime': _realtime }
 
 class HAProxyTop(object):
@@ -38,14 +37,14 @@ class HAProxyTop(object):
         #set initial display options
         self.tree = True
         self.filter = filter
+        self.counters = {}
         self.active_view = 'realtime'
+        self.valid_filters = [ 'proxy_name', 'name' ]
         self.sort = { 'func': views[self.active_view][0][3], 'reversed': False }
 
-        self.servers = [ HAProxyServer(s) for s in server_list ]
-        self.keys = self.servers[0].fields
-        self.valid_filters = [ 'proxy_name', 'name' ]
 
-        self.stats  = {}
+        self.servers = [ HAProxyServer(s) for s in server_list ]
+
         while True:
             self.display(self.poll())
 
@@ -60,21 +59,22 @@ class HAProxyTop(object):
             s.update()
             display_items += s.backends
 
+        self.counters['proxies'] = len(self.servers)
+        self.counters['backends'] = len(display_items)
+        self.counters['listeners'] = sum([len(i.listeners) for i in display_items]) 
+
         return sorted(display_items, key=self.sort['func'], reverse=self.sort['reversed'])
 
-#        if self.sums:
-#            self.display_stats = deepcopy(list(self.stats.values()))
-#        else:
-#            self.display_stats = self._diff_stats(self.stats,last_stats)
-#
-#        if self.sort['key']:
-#            self.display_stats = sorted(self.display_stats,
-#                    key=self._sorter,reverse=self.sort['reversed'])
-#
 #        if self.filter:
 #            ftype,fvalue = self.filter.split(':')
 #            self.display_stats = [ s for s in self.display_stats \
 #                                         if fvalue in s[ftype] ]
+
+    def _get_counter_msg(self):
+        return '%d proxy %d backends %d listeners' % \
+                (self.counters['proxies'],
+                 self.counters['backends'],
+                 self.counters['listeners'])
 
     def _truncate(self, s, max_len):
         i = max_len -4
@@ -97,8 +97,8 @@ class HAProxyTop(object):
        
         #first line
         s.addstr(1, 2, 'haproxytop -')
-        s.addstr(1, 18, datetime.now().strftime('%H:%M:%S'))
-        s.addstr(1, 28, ('%s backends' % len(backends)))
+        s.addstr(1, 15, datetime.now().strftime('%H:%M:%S'))
+        s.addstr(1, 26, self._get_counter_msg())
         if self.filter:
             s.addstr(1, 42, ('filter: %s' % self.filter))
 
