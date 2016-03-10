@@ -8,11 +8,11 @@ from argparse import ArgumentParser
 from curses.textpad import Textbox,rectangle
 from haproxystats import HAProxyServer
 
-from menu import run_menu
-from util import format_bytes
+from haproxytop.menu import run_menu
+from haproxytop.util import format_bytes
+from haproxytop.version import version
 
 _startcol = 2
-version = '0.1'
 
 """
 *VIEWS*
