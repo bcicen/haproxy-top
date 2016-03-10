@@ -9,7 +9,7 @@ from curses.textpad import Textbox,rectangle
 from haproxystats import HAProxyServer
 
 from haproxytop.menu import run_menu
-from haproxytop.util import format_bytes
+from haproxytop.util import format_bytes, ucode_to_str
 from haproxytop.version import version
 
 _startcol = 2
@@ -164,7 +164,7 @@ class HAProxyTop(object):
                             value = str(l.__getattribute__(c[2]))
                         
                         if c[0] == 'NAME':
-                            value = '├ ' + value
+                            value = ucode_to_str(9500) + value
 
                         if len(value) >= width:
                             value = self._truncate(value, width)

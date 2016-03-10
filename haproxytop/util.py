@@ -1,4 +1,7 @@
+import sys
 from datetime import datetime
+
+_pymajorver = sys.version_info.major
 
 def format_bytes(b):
     b = float(b)
@@ -12,6 +15,12 @@ def format_bytes(b):
         return '%.1f' % float(b/1000000000) + ' gB'
     elif 1000000000000 <= b:
         return '%.1f' % float(b/1000000000000) + ' tB'
+
+def ucode_to_str(i):
+    """ character code to str conversion """
+    if _pymajorver == 2:
+        return unichr(i)
+    return chr(i)
 
 def unix_time(dt):
     epoch = datetime.utcfromtimestamp(0)
