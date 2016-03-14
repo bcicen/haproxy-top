@@ -39,16 +39,19 @@ class HAProxyTop(object):
         self.filter = filter
         self.counters = {}
         self.active_view = 'realtime'
-        self.valid_filters = [ 'proxy_name', 'name' ]
+        self.filter_fields = [ 'proxy_name', 'name' ]
         self.sort = { 'func': views[self.active_view][0][3], 'reversed': False }
 
-
         self.servers = [ HAProxyServer(s) for s in server_list ]
+        signal.signal(signal.SIGINT, self._sig_handler)
 
         while True:
             self.display(self.poll())
 
-    def sig_handler(self, signal, frame):
+    def _sig_handler(self, signal, frame):
+        self._exit()
+
+    def _exit(self, code=0):
         curses.endwin()
         sys.exit(0)
 
@@ -63,13 +66,18 @@ class HAProxyTop(object):
         self.counters['backends'] = len(display_items)
         self.counters['listeners'] = sum([len(i.listeners) for i in display_items]) 
 
+        if self.filter:
+            display_items = self._filtered(display_items)
+
         return sorted(display_items, key=self.sort['func'], reverse=self.sort['reversed'])
 
-#        if self.filter:
-#            ftype,fvalue = self.filter.split(':')
-#            self.display_stats = [ s for s in self.display_stats \
-#                                         if fvalue in s[ftype] ]
-
+    def _filtered(self, l):
+        ret = set()
+        for field in self.filter_fields:
+            [ ret.add(i) for i in l if \
+              self.filter in i.__getattribute__(field) ]
+        return list(ret)
+            
     def _get_counter_msg(self):
         return '%d proxy %d backends %d listeners' % \
                 (self.counters['proxies'],
@@ -92,7 +100,6 @@ class HAProxyTop(object):
         s.border(0)
 
         h,w = s.getmaxyx()
-        signal.signal(signal.SIGINT, self.sig_handler)
         s.clear()
        
         #first line
@@ -100,7 +107,7 @@ class HAProxyTop(object):
         s.addstr(1, 15, datetime.now().strftime('%H:%M:%S'))
         s.addstr(1, 26, self._get_counter_msg())
         if self.filter:
-            s.addstr(1, 42, ('filter: %s' % self.filter))
+            s.addstr(1, 65, ('filter: %s' % self.filter))
 
         columns = views[self.active_view]
 
@@ -195,17 +202,16 @@ class HAProxyTop(object):
             s.clear()
             startx = int(w / 2 - 20) # I have no idea why this offset of 20 is needed
 
-            print(type(startx))
             s.addstr(6, startx+1, 'haproxy-top version %s' % version)
             s.addstr(8, startx+1, 't - tree')
             s.addstr(9, startx+1, 's - select sort field')
-            s.addstr(9, startx+1, 'r - reverse sort order')
-            s.addstr(10, startx+1, 'f - filter by container name')
-            s.addstr(11, startx+5, '(e.g. source:localhost)')
-            s.addstr(12, startx+1, 'h - show this help dialog')
-            s.addstr(13, startx+1, 'q - quit')
+            s.addstr(10, startx+1, 'r - reverse sort order')
+            s.addstr(11, startx+1, 'f - filter by container name')
+            s.addstr(12, startx+5, '(e.g. source:localhost)')
+            s.addstr(13, startx+1, 'h - show this help dialog')
+            s.addstr(14, startx+1, 'q - quit')
 
-            rectangle(s, 7,startx, 14,(startx+48))
+            rectangle(s, 7,startx, 15,(startx+48))
             s.refresh()
             s.nodelay(0)
             s.getch()
@@ -218,19 +224,20 @@ class HAProxyTop(object):
             self.sort['reversed'] = not self.sort['reversed']
 
         if x == ord('s'):
-            startx = w / 2 - 20 # I have no idea why this offset of 20 is needed
+            startx = int(w / 2 - 20) # I have no idea why this offset of 20 is needed
 
             opts = [ i[0] for i in views[self.active_view] if i[3] ]
             selected = run_menu(tuple(opts), x=int(startx), y=6, name="sort")
             self.sort['func'] = views[self.active_view][selected][3]
 
         if x == ord('f'):
-            startx = w / 2 - 20 # I have no idea why this offset of 20 is needed
+            s.clear()
+            startx = int(w / 2 - 20) # I have no idea why this offset of 20 is needed
 
             s.addstr(6, startx, 'String to filter for:')
 
-            editwin = curses.newwin(1,30, 12,(startx+1))
-            rectangle(s, 11,startx, 13,(startx+31))
+            editwin = curses.newwin(1, 30, 9, (startx+1))
+            rectangle(s, 8, startx, 10, (startx+31))
             curses.curs_set(1) #make cursor visible in this box
             s.refresh()
 
@@ -239,42 +246,17 @@ class HAProxyTop(object):
 
             self.filter = str(box.gather()).strip(' ')
             curses.curs_set(0)
-            
-            #check if valid filter
-            if not self._validate_filter():
-                self.filter = None
-                s.clear()
-                s.addstr(6, startx+5, 'Invalid filter')
-                s.refresh()
-                curses.napms(800)
-
-
-    def _sorter(self,d):
-        return d[self.sort['key']]
-
-    def _validate_filter(self):
-        if not self.filter:
-            return True
-
-        if ':' not in self.filter:
-            return False
-
-        ftype,fvalue = self.filter.split(':')
-        if ftype not in self.valid_filters:
-            return False
-
-        return True
 
 def main():
     parser = ArgumentParser(description='haproxy-top v%s' % version)
-    parser.add_argument('endpoints', nargs='*', action='append')
+    parser.add_argument('hosts', nargs='*', action='append')
     args = parser.parse_args()
 
-    endpoints = args.endpoints[0]
-    if len(endpoints) == 0:
-        print('no haproxy stat endpoints provided')
+    hosts = args.hosts[0]
+    if len(hosts) == 0:
+        print('no haproxy stat hosts provided')
 
-    HAProxyTop(endpoints)
+    HAProxyTop(hosts)
 
 if __name__ == '__main__':
     main()
