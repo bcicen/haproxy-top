@@ -22,9 +22,9 @@ Columns for each view are defined in a tuple:
 
 _realtime = [
         ('NAME', 30, 'name', lambda x: x.name),
-        ('STATUS', 7, 'status', lambda x: x.status),
-        ('SESSIONS', 9, ('scur', 'slim'), lambda x: x.scur),
-        ('REQUESTS', 9, ('req_rate', 'req_tot'), lambda x: x.req_rate),
+        ('STATUS', 8, 'status', lambda x: x.status),
+        ('SESSIONS', 11, ('scur', 'slim'), lambda x: x.scur),
+        ('REQUESTS', 11, ('req_rate', 'req_tot'), lambda x: x.req_rate),
         ('NET I/O', 20, ('bin', 'bout'), lambda x: x.bin + x.bout),
         ('CRQ TIME', 20, ('ctime', 'rtime', 'qtime', 'ttime'), None),
         ('PROXY', 15, 'proxy_name', lambda x: x.proxy_name)
@@ -201,8 +201,7 @@ class HAProxyTop(object):
 
         x = s.getch()
         if x == ord('q'):
-            curses.endwin()
-            sys.exit(0)
+            self._exit()
 
         if x == ord('h') or x == ord('?'):
             s.clear()
@@ -212,12 +211,11 @@ class HAProxyTop(object):
             s.addstr(8, startx+1, 't - tree')
             s.addstr(9, startx+1, 's - select sort field')
             s.addstr(10, startx+1, 'r - reverse sort order')
-            s.addstr(11, startx+1, 'f - filter by container name')
-            s.addstr(12, startx+5, '(e.g. source:localhost)')
-            s.addstr(13, startx+1, 'h - show this help dialog')
-            s.addstr(14, startx+1, 'q - quit')
+            s.addstr(11, startx+1, 'f - filter by name')
+            s.addstr(12, startx+1, 'h - show this help dialog')
+            s.addstr(13, startx+1, 'q - quit')
 
-            rectangle(s, 7,startx, 15,(startx+48))
+            rectangle(s, 7,startx, 14,(startx+48))
             s.refresh()
             s.nodelay(0)
             s.getch()
