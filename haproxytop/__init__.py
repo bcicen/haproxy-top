@@ -46,13 +46,19 @@ class HAProxyTop(object):
         signal.signal(signal.SIGINT, self._sig_handler)
 
         while True:
-            self.display(self.poll())
+            try:
+                self.display(self.poll())
+            except Exception as e:
+                self._exit(ex=e)
 
     def _sig_handler(self, signal, frame):
         self._exit()
 
-    def _exit(self, code=0):
+    def _exit(self, ex=None):
         curses.endwin()
+        if ex:
+            print(ex)
+            sys.exit(1)
         sys.exit(0)
 
     def poll(self):
